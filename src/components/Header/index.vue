@@ -42,6 +42,7 @@
             type="text"
             id="autocomplete"
             class="input-error input-xxlarge"
+            v-model="keyword"
           />
           <button
             class="sui-btn btn-xlarge btn-danger"
@@ -59,9 +60,36 @@
 <script>
 export default {
   name: "Header",
+  data() {
+    return {
+      keyword: "",
+    };
+  },
   methods: {
     toSearch() {
-      this.$router.push("/search");
+      // this.$router.push("/search");
+      let location = {
+        //1、对象写法
+        //当传递参数传递有params参数的时候，对象写法必须是name和params去组合
+        //当传递参数有query的时候无所谓
+
+        //2、怎么指定params参数可传可不传
+        // 在路由路径当中获取params参数的时候加?
+
+        //3、传递的params参数如果是空串，路径也会出问题
+        // 要么不指定params参数   要么传递过去一个undefined 代表什么都没传，不能直接传空串
+        // 前提得  params参数可传可不传
+
+        // path: "/search",
+        name: "search",
+        params: {
+          keyword: this.keyword || undefined,
+        },
+        query: {
+          keyword: this.keyword.toUpperCase(),
+        },
+      };
+      this.$router.push(location);
     },
   },
 };
