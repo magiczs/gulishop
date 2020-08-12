@@ -10,6 +10,7 @@ vue create 'xxx' vue 脚手架创建项目
 assets--公共静态文件夹
 components--非路由组件(公共组件)
 pages 或者 views--路由组件文件夹
+router--路由配置项
 
 ## 03、vue 的 main.js 基本编码
 

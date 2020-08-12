@@ -23,7 +23,7 @@ export default [
     },
   },
   {
-    path: "/search/:keyword?",
+    path: "/search",
     component: Search,
     name: "search",
     // props: true,
