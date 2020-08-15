@@ -2,7 +2,131 @@
   <!-- 商品分类导航 -->
   <div class="type-nav">
     <div class="container">
-      <h2 class="all">全部商品分类</h2>
+      <div @mouseleave="moveOutDiv" @mouseenter="moveInDiv">
+        <h2 class="all">全部商品分类</h2>
+        <transition name="show">
+          <div class="sort" v-show="isShow">
+            <div class="all-sort-list2" @click="toSearch">
+              <div
+                class="item"
+                @mouseenter="moveIn(index)"
+                :class="{ item_on: currentIndex === index }"
+                v-for="(c1, index) in categoryList"
+                :key="c1.categoryId"
+              >
+                <h3>
+                  <!-- <router-link
+                  :to="{
+                    name: 'search',
+                    query: {
+                      categoryName: c1.categoryName,
+                      category1Id: c1.categoryId,
+                    },
+                  }"
+                  >{{ c1.categoryName }}</router-link
+                > -->
+                  <!-- <a
+                  href="javascript:;"
+                  @click="
+                    $router.push({
+                      name: 'search',
+                      query: {
+                        categoryName: c1.categoryName,
+                        category1Id: c1.categoryId,
+                      },
+                    })
+                  "
+                  >{{ c1.categoryName }}</a
+                > -->
+                  <a
+                    href="javascript:;"
+                    :data-categoryName="c1.categoryName"
+                    :data-category1Id="c1.categoryId"
+                    >{{ c1.categoryName }}</a
+                  >
+                </h3>
+                <div class="item-list clearfix">
+                  <div class="subitem">
+                    <dl
+                      class="fore"
+                      v-for="c2 in c1.categoryChild"
+                      :key="c2.categoryId"
+                    >
+                      <dt>
+                        <!-- <a href="">{{ c2.categoryName }}</a> -->
+                        <!-- <router-link
+                        :to="{
+                          name: 'search',
+                          query: {
+                            categoryName: c2.categoryName,
+                            category2Id: c2.categoryId,
+                          },
+                        }"
+                        >{{ c2.categoryName }}</router-link
+                      > -->
+                        <!-- <a
+                        href="javascript:;"
+                        @click="
+                          $router.push({
+                            name: 'search',
+                            query: {
+                              categoryName: c2.categoryName,
+                              category2Id: c2.categoryId,
+                            },
+                          })
+                        "
+                        >{{ c2.categoryName }}</a
+                      > -->
+                        <a
+                          href="javascript:;"
+                          :data-categoryName="c2.categoryName"
+                          :data-category2Id="c2.categoryId"
+                          >{{ c2.categoryName }}</a
+                        >
+                      </dt>
+                      <dd>
+                        <em v-for="c3 in c2.categoryChild" :key="c3.categoryId">
+                          <!-- <a href="">{{ c3.categoryName }}</a> -->
+                          <!-- <router-link
+                          :to="{
+                            name: 'search',
+                            query: {
+                              categoryName: c3.categoryName,
+                              category3Id: c3.categoryId,
+                            },
+                          }"
+                          >{{ c3.categoryName }}</router-link
+                        > -->
+                          <!-- <a
+                          href="javascript:;"
+                          @click="
+                            $router.push({
+                              name: 'search',
+                              query: {
+                                categoryName: c3.categoryName,
+                                category3Id: c3.categoryId,
+                              },
+                            })
+                          "
+                          >{{ c3.categoryName }}</a
+                        > -->
+                          <a
+                            href="javascript:;"
+                            :data-categoryName="c3.categoryName"
+                            :data-category3Id="c3.categoryId"
+                            >{{ c3.categoryName }}</a
+                          >
+                        </em>
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </div>
+
       <nav class="nav">
         <a href="###">服装城</a>
         <a href="###">美妆馆</a>
@@ -13,43 +137,75 @@
         <a href="###">有趣</a>
         <a href="###">秒杀</a>
       </nav>
-      <div class="sort">
-        <div class="all-sort-list2">
-          <div class="item" v-for="c1 in categoryList" :key="c1.categoryId">
-            <h3>
-              <a href="">{{c1.categoryName}}</a>
-            </h3>
-            <div class="item-list clearfix">
-              <div class="subitem">
-                <dl class="fore" v-for="c2 in c1.categoryChild" :key="c2.categoryId">
-                  <dt>
-                    <a href="">{{c2.categoryName}}</a>
-                  </dt>
-                  <dd>
-                    <em v-for="c3 in c2.categoryChild" :key="c3.categoryId">
-                      <a href="">{{c3.categoryName}}</a>
-                    </em>
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { mapState } from "vuex";
+import { mapState, mapActions } from "vuex";
+// import throttle from "lodash/throttle";
+import { throttle } from "lodash";
 export default {
   name: "TypeNav",
+  data() {
+    return {
+      currentIndex: -1,
+      isShow: true,
+    };
+  },
   mounted() {
-    this.getCategoryList();
+    if (this.$route.path !== "/home") {
+      this.isShow = false;
+    }
   },
   methods: {
-    getCategoryList() {
-      this.$store.dispatch("getCategoryList");
+    moveIn(index) {
+      this.currentIndex = index;
+    },
+    moveIn: throttle(
+      function(index) {
+        this.currentIndex = index;
+      },
+      30,
+      { trailing: false }
+    ),
+
+    toSearch(event) {
+      let target = event.target;
+      let data = target.dataset;
+      let { categoryname, category1id, category2id, category3id } = data;
+      if (categoryname) {
+        let location = {
+          name: "search",
+        };
+        let query = {
+          categoryName: categoryname,
+        };
+        if (category1id) {
+          query.category1Id = category1id;
+        } else if (category2id) {
+          query.category2Id = category2id;
+        } else {
+          query.category3Id = category3id;
+        }
+        location.query = query;
+
+        if (this.$route.params) {
+          location.params = this.$route.params;
+        }
+
+        this.$router.push(location);
+      }
+    },
+
+    moveInDiv() {
+      this.isShow = true;
+    },
+    moveOutDiv() {
+      this.currentIndex = -1;
+      if (this.$route.path !== "/home") {
+        this.isShow = false;
+      }
     },
   },
   computed: {
@@ -99,8 +255,19 @@ export default {
       height: 461px;
       position: absolute;
       background: #fafafa;
+      // background: red;
       z-index: 999;
-
+      &.show-enter {
+        opacity: 0;
+        height: 0;
+      }
+      &.show-enter-to {
+        opacity: 1;
+        height: 461px;
+      }
+      &.show-enter-active {
+        transition: all 0.5s;
+      }
       .all-sort-list2 {
         .item {
           h3 {
@@ -153,7 +320,7 @@ export default {
 
                 dd {
                   float: left;
-                  width: 415px;
+                  width: 555px;
                   padding: 3px 0 0;
                   overflow: hidden;
 
@@ -170,7 +337,8 @@ export default {
             }
           }
 
-          &:hover {
+          &.item_on {
+            background-color: skyblue;
             .item-list {
               display: block;
             }

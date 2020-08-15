@@ -23,16 +23,16 @@ export default [
     },
   },
   {
-    path: "/search",
+    path: "/search/:keyword?",
     component: Search,
     name: "search",
     // props: true,
-    props(route) {
-      return {
-        keyword: route.params.keyword,
-        keyword2: route.query.keyword,
-      };
-    },
+    // props(route) {
+    //   return {
+    //     keyword: route.params.keyword,
+    //     keyword2: route.query.keyword,
+    //   };
+    // },
   },
   {
     path: "/",

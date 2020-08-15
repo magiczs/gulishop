@@ -82,6 +82,19 @@ Home Search Login Register 都是点击才会出现所以是路由组件并且�
 将相应的 css 或者 less 文件放入组件中
 将图片文件(logo.png 和 wx_cz.jpg)放入组件文件夹下的 images 文件夹中
 在 App.vue 文件中引入并注册组件
+
+```js
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+export default {
+  name: "App",
+  components: {
+    Header,
+    Footer,
+  },
+};
+```
+
 缺少 less-loader,npm i less-loader -D 下载包
 初始化样式:将 reset.css 文件复制到与 index.html 同级的 css 文件夹内
 在 index.html 中引入 reset.css
@@ -175,6 +188,33 @@ methods: {
       this.$router.push('/search')
     },
   },
+```
+
+### 解决多次触发编程式导航 报错的问题
+
+```js
+const originPush = VueRouter.prototype.push; //保存原来的push函数 ，后面修改之后可以找到原来的
+const originReplace = VueRouter.prototype.replace;
+
+VueRouter.prototype.push = function(location, onResolved, onRejected) {
+  //调用push根本没有处理promise的回调，无论成功和失败
+  if (onResolved === undefined && onRejected === undefined) {
+    return originPush.call(this, location).catch(() => {});
+  } else {
+    //代表调用push的时候，传了处理promise的回调
+    return originPush.call(this, location, onResolved, onRejected);
+  }
+};
+
+VueRouter.prototype.replace = function(location, onResolved, onRejected) {
+  //调用push根本没有处理promise的回调，无论成功和失败
+  if (onResolved === undefined && onRejected === undefined) {
+    return originReplace.call(this, location).catch(() => {});
+  } else {
+    //代表调用push的时候，传了处理promise的回调
+    return originReplace.call(this, location, onResolved, onRejected);
+  }
+};
 ```
 
 ## 11、登录注册不需要 Footer,通过路由 meta 配置解决
@@ -528,3 +568,256 @@ export default {
   <a href="">{{c3.categoryName}}</a>
 </em>
 ```
+
+## 20、事件控制 23 级的显示和隐藏
+
+将 css 控制显示隐藏改为事件控制
+修改 css 类名
+
+```css
+&.item_on {
+  background-color: skyblue;
+  .item-list {
+    display: block;
+  }
+}
+```
+
+添加移入和移出事件,移出事件我们需要添加在外部一个 div 上
+
+```html
+<div @mouseleave="currentIndex=-1 ">
+  <h2 class="all">全部商品分类</h2>
+  <div
+    @mouseenter="moveIn(index)"
+    :class="{item_on:currentIndex === index}"
+  ></div>
+</div>
+```
+
+定义鼠标移入方法
+
+```js
+data() {
+    return {
+      currentIndex: -1, //当前移入项的下标  初始值 -1  移入某一项，就把这个值改为移入的这项的下标
+    };
+  },
+moveIn(index) {
+    //移入某一项 就把currentIndex的值改为移入这个项的下标
+    //而我们在项上添加的item_on这个类就会生效
+    this.currentIndex = index;
+     },
+```
+
+## 21、演示快速触发事件卡顿现象
+
+鼠标快速移动会发生卡顿现象
+
+## 22、函数的防抖和节流讲解
+
+100 秒触发 100 次
+正常：事件触发非常频繁，而且每一次的触发，回调函数都要去执行
+节流：在规定的间隔时间范围内不会重复触发回调，只有大于这个时间间隔才会触发回调，把频繁触发变为少量触发
+防抖：前面的所有的触发都被取消，最后一次执行在规定的时间之后才会，也就是说如果连续快速的触发 只会执行一次
+
+## 23、24 优化快速触发 typeNav 鼠标移入和移出事件，节流 lodash 的 throttle 节流操作、按需引入 lodash 减少打包体积
+
+```js
+import {throttle} from "lodash";
+moveIn: throttle(
+      function (index) {
+        //throttle是一个函数，内部需要传递一个回调函数，最后会返回一个新的函数
+        this.currentIndex = index;
+      },
+      30,
+      { trailing: false }
+    ), //在刚触发就执行
+```
+
+## 25、解决使用 lodash 节流后，快速移出后，可能还会显示某个子项
+
+```js
+{
+  trailing: fasle;
+} //的作用    是否在结束延迟之后调用
+```
+
+## 26、点击某个类别（无论几级）跳转到搜索页面
+
+先用声明式导航替换原来的 a
+需要把类别的 id 和类别的名字通过 query 参数传递
+此方法会造成卡顿
+
+```html
+<router-link
+  :to="{name:'search',query:{categoryName:c2.categoryName,category2Id:c2.categoryId}}"
+  >{{c2.categoryName}}</router-link
+>
+```
+
+## 27、使用编程式路由导航优化声明式导航组件对象过多造成的卡顿
+
+声明式导航本质上是组件对象，组件对象过多，会造成效率很慢 所以会很卡
+
+## 28、29 利用事件委派提高处理事件的效率、利用自定义属性携带动态数据
+
+每个项都添加事件，事件的回调函数很多，效率也不好
+在共同的父级元素添加事件监听
+
+```html
+<div class="container" @click="toSearch"></div>
+```
+
+问题：怎么知道点击的是不是 a 标签
+问题：怎么知道点击的是一级还是二级还是三级
+问题：参数怎么携带，要携带携带哪些个的参数
+通过设置自定义属性
+
+```html
+<a
+  href="javascript:;"
+  :data-categoryName="c1.categoryName"
+  :data-category1Id="c1.categoryId"
+  >{{c1.categoryName}}</a
+>
+```
+
+定义点击事件回调
+
+```js
+    //点击类别事件回调
+    toSearch(event) {
+      //event 就是我们的事件对象
+      let target = event.target //就是我们的目标元素（真正发生事件的儿子元素）
+      let data = target.dataset //拿到目标元素身上所有的自定义属性组成的对象
+      // 什么时候点的就是a标签  data当中存在categoryname那么就是点击的a标签
+      let {categoryname,category1id,category2id,category3id} = data
+
+      if(categoryname){
+        //点击的就是a标签
+        let location = {
+          name:'search'
+        }
+        let query = {
+          categoryName:categoryname
+        }
+        if(category1id){
+          query.category1Id = category1id
+        }else if(category2id){
+          query.category2Id = category2id
+        }else{
+          query.category3Id = category3id
+        }
+        //到了这query参数就收集ok
+        location.query = query
+
+        //点击类别的时候带的是query参数，我们得去看看原来有没有params参数，有的话也得带上
+        if(this.$route.params){
+          location.params = this.$route.params
+        }
+
+        this.$router.push(location)
+      }//else{
+      //   //点击不是a标签，不关心
+      // }
+    },
+```
+
+## 30、搜索页的 typeNav 一级列表隐藏
+
+首先这个组件被多个页面公用
+在 mounted 的时候可以判断路由是不是 home 如果不是把 isShow 改为 false, 只是初始显示组件的时候隐藏一级分类
+
+```html
+<div class="sort" v-show="isShow"></div>
+```
+
+```js
+mounted() {
+    if(this.$route.path !== '/home'){
+      this.isShow = false
+    }
+  },
+```
+
+## 31、显示和隐藏一级列表的过渡效果添加
+
+首先谁要加过渡就看谁在隐藏和显示
+需要放在 transition 标签内部，name 需要起名字
+
+<transition name="show"> 
+<div class="sort" v-show="isShow"></div>
+</transition>
+设置鼠标移入移出事件
+<div @mouseleave="moveOutDiv" @mouseenter="moveInDiv">
+设置鼠标移入移出函数
+
+```js
+moveInDiv() {
+    this.isShow = true;
+  },
+  moveOutDiv() {
+    this.currentIndex = -1;
+    if (this.$route.path !== "/home") {
+      this.isShow = false;
+    }
+  },
+```
+
+设置 CSS
+
+```css
+&.show-enter {
+  opacity: 0;
+  height: 0;
+}
+&.show-enter-to {
+  opacity: 1;
+  height: 461px;
+}
+&.show-enter-active {
+  transition: all 0.5s;
+}
+```
+
+## 32、优化 typeNav 数据 ajax 请求次数，改变请求的位置
+
+之前我们是在 typeNav 组件内部 dispatch 去发送 ajax 请求，这样的话
+因为 typeNav 是被多个页面公用的，所以每次切换到一个页面，这个组件都会重新创建 mounted 都会执行
+因此有几个页面公用了这个 typeNav 就会执行几次 ajax 请求
+所以我们放到 App 里面就只用执行一次，因为数据一样，没必要多次请求
+
+```js
+import { mapActions } from "vuex";
+mounted() {
+    this.getCategoryList();
+  },
+methods: {
+    ...mapActions(["getCategoryList"]),
+  },
+```
+
+## 33、合并分类的 query 参数和搜索关键字的 params 参数
+
+点击类别选项的时候，去看看有没有 params 参数
+见 28、29 步
+点击 search 按钮的时候，去看看有没有 query 参数(在 Header 中设置)
+
+```js
+toSearch() {
+  let location = {
+    name: "search",
+    params: {
+      keyword: this.keyword || undefined,
+    },
+  };
+  if (this.$route.query) {
+    location.query = this.$route.query;
+  }
+  this.$router.push(location);
+},
+```
+
+注意：我们点击搜索的时候关键字使用的是 params 参数
+点击类别选项的时候我们的参数使用的是 query 参数

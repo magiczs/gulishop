@@ -9,8 +9,15 @@
 <script>
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { mapActions } from "vuex";
 export default {
   name: "App",
+  mounted() {
+    this.getCategoryList();
+  },
+  methods: {
+    ...mapActions(["getCategoryList"]),
+  },
   components: {
     Header,
     Footer,

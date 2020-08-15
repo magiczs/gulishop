@@ -18,7 +18,7 @@ VueRouter.prototype.push = function(location, onResolved, onRejected) {
 VueRouter.prototype.replace = function(location, onResolved, onRejected) {
   if (onResolved === undefined && onRejected === undefined) {
     return originReplace.call(this, location).catch(() => {});
-  }else{
+  } else {
     return originReplace.call(this, location, onResolved, onRejected);
   }
 };
@@ -26,3 +26,6 @@ const router = new VueRouter({
   routes,
 });
 export default router;
+// export const router = new VueRouter({
+//   routes,
+// });

@@ -8,8 +8,8 @@
           <p>尚品汇欢迎您！</p>
           <p>
             <span>请</span>
-            <router-link to="/login">登录</router-link>
-            <router-link to="/register">免费注册</router-link>
+            <router-link to="/login"> 登录 </router-link>
+            <router-link to="/register" class="register">免费注册</router-link>
             <!-- <a href="###">登录</a> -->
             <!-- <a href="###" class="register">免费注册</a> -->
           </p>
@@ -85,10 +85,10 @@ export default {
         params: {
           keyword: this.keyword || undefined,
         },
-        query: {
-          keyword: this.keyword.toUpperCase(),
-        },
       };
+      if (this.$route.query) {
+        location.query = this.$route.query;
+      }
       this.$router.push(location);
     },
   },
