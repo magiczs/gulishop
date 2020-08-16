@@ -821,3 +821,445 @@ toSearch() {
 
 注意：我们点击搜索的时候关键字使用的是 params 参数
 点击类别选项的时候我们的参数使用的是 query 参数
+
+## 34、设计 json 数据的结构和值
+
+创建 mock 文件夹,模拟本地数据,创建 banner.json floor.json
+
+## 35、使用 mockjs 来模拟数据接口
+
+mock 会拦截我们的 ajax 请求，不会真正去发送请求。
+安装
+npm i mockjs -S
+创建 mockServer.js 文件(相当于后台服务)
+
+```js
+import mock from "mockjs";
+import banner from "./banner.json";
+import floor from "@/mock/floor";
+
+mock.mock("/mock/banner", { code: 200, data: banner });
+mock.mock("/mock/floor", { code: 200, data: floor });
+//这个方法就是用来让我们模拟接口使用的
+//第一个参数是模拟的接口路径
+//第二个参数是返回的数据
+```
+
+在 main.js 中引入 mock 服务
+
+```js
+import "@/mock/mockServer";
+```
+
+封装 mockAjax
+在 ajax 文件夹中创建 mockAjax.js 文件
+只需要将 baseURL 改为/moke,其他配置一样
+
+```js
+const instance = axios.create({
+  baseURL: "/mock", //配置请求基础路径
+  timeout: 20000, //配置请求超时时间
+});
+```
+
+## 36、mock 数据的随机语法
+
+看文档
+http://mockjs.com/examples.html
+
+## 37、mock 数据的 vuex 编码
+
+在 api 中添加 mock 接口的请求函数,请求模拟的 bannerList 和 floorList 数据
+
+```js
+import mockAjax from "@/ajax/mockAjax";
+//请求banner和floor  mock的接口请求函数
+export const reqBannerList = () => {
+  return mockAjax({
+    url: "/banner",
+    method: "get",
+  });
+};
+export const reqFloorList = () => {
+  return mockAjax({
+    url: "/floor",
+    method: "get",
+  });
+};
+```
+
+在 store 中的 home.js 中创建 bannerList 和 floorList 数据以及发送请求的函数
+
+```js
+//引入请求moke接口的函数
+import { reqBannerList, reqFloorList } from "@/api";
+//初始化需要请求的数据
+const state = {
+  bannerList: [],
+  floorList: [],
+};
+//修改数据的方法
+const mutations = {
+  //直接修改数据  （不允许出现if  for  异步操作）
+  RECEIVEBANNERLIST(state, bannerList) {
+    state.bannerList = bannerList;
+  },
+  RECEIVEFLOORLIST(state, floorList) {
+    state.floorList = floorList;
+  },
+};
+//发送异步请求获取数据的方法
+const actions = {
+  //异步请求获取数据  允许if  for  异步操作
+  async getBannerList({ commit }) {
+    const result = await reqBannerList();
+    if (result.code === 200) {
+      commit("RECEIVEBANNERLIST", result.data);
+    }
+  },
+  async getFloorList({ commit }) {
+    const result = await reqFloorList();
+    if (result.code === 200) {
+      commit("RECEIVEFLOORLIST", result.data);
+    }
+  },
+};
+```
+
+在 ListContainer 组件中分发 getBannerList 事件
+
+```js
+mounted() {
+    this.$store.dispatch("getBannerList");
+  },
+```
+
+从 vuex 中获取 bannerList 数据
+
+```js
+computed: {
+    ...mapState({
+      bannerList: (state) => state.home.bannerList,
+    }),
+  },
+```
+
+在结构中使用动态数据
+
+```html
+<div class="swiper-slide" v-for="banner in bannerList" :key="banner.id">
+  <img :src="banner.imgUrl" />
+</div>
+```
+
+图片显示有问题,原因是使用 mock 数据路径会出问题(脚手架内默认是这样配置的)
+需要将图片放到 public 下的 images 中
+
+在 Home 组件中获取 floorList 数据(因为 Floor 组件用了两次,获取数据后在 home 中 v-for 遍历即可)
+
+```js
+mounted(){
+    this.$store.dispatch('getFloorList')
+  },
+  computed:{
+    ...mapState({
+      floorList:state => state.home.floorList
+    })
+  }
+```
+
+结构中使用数据
+并且将 floor 数据使用 props 传入 Floor 组件中
+
+```html
+<Floor
+  v-for="(floor, index) in floorList"
+  :key="floor.id"
+  :floor="floor"
+></Floor>
+```
+
+在 Floor 组件中接收 floor 数据
+
+```js
+props: ["floor"],
+```
+
+在结构中动态展示 floor 数据
+
+```html
+<div class="title clearfix">
+  <h3 class="fl">{{floor.name}}</h3>
+  <div class="fr">
+    <ul class="nav-tabs clearfix">
+      <li class="active" v-for="(nav, index) in floor.navList" :key="index">
+        <a href="#tab1" data-toggle="tab">{{nav.text}}</a>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="blockgary">
+  <ul class="jd-list">
+    <li v-for="(keyword, index) in floor.keywords" :key="index">{{keyword}}</li>
+  </ul>
+  <img :src="floor.imgUrl" />
+</div>
+
+<div
+  class="swiper-slide"
+  v-for="(carousel, index) in floor.carouselList"
+  :key="carousel.id"
+>
+  <img :src="carousel.imgUrl" />
+</div>
+
+<div class="split">
+  <span class="floor-x-line"></span>
+  <div class="floor-conver-pit">
+    <img :src="floor.recommendList[0]" />
+  </div>
+  <div class="floor-conver-pit">
+    <img :src="floor.recommendList[1]" />
+  </div>
+</div>
+<div class="split center">
+  <img :src="floor.bigImg" />
+</div>
+<div class="split">
+  <span class="floor-x-line"></span>
+  <div class="floor-conver-pit">
+    <img :src="floor.recommendList[2]" />
+  </div>
+  <div class="floor-conver-pit">
+    <img :src="floor.recommendList[3]" />
+  </div>
+</div>
+```
+
+## 38、实现页面轮播
+
+swiper 的用法参考官方网站
+安装(需要安装 5 版本,6 版本有问题)
+npm i swoper@5 -S
+引入 js 和 css
+
+```js
+import Swiper from "swiper";
+import "swiper/css/swiper.css";
+```
+
+## 39、解决 swiper 影响多个页面的 bug
+
+通过选择器可以指定哪个地方需要，但是不好
+通过 ref 最好
+
+```html
+<div class="swiper-container" ref="banner"></div>
+```
+
+swiper 必须在页面的数据结构显示完成后创建才会生效
+
+```js
+mounted() {
+    //在这里实例化swiper是不行的
+    // 原因: 轮播图的结构还没有形成
+    //mounted内部才去请求数据，mounted内部已经实例化swiper
+  },
+```
+
+## 40、swiper 创建的时间应该是在页面列表创建之后才会有效果
+
+静态页面是没问题的
+静态页面不需要等待数据，因此 monted 完全可以去创建 swiper
+现在我们的数据是动态的，monted 内部去创建，数据还没更新到界面上，因此无效
+
+## 41、使用 watch + nextTick 去解决比较好
+
+Vue.nextTick 和 vm.\$nextTick 效果一样
+nextTick 是在最近的更新 dom 之后会立即调用传入 nextTick 的回调函数
+
+```js
+watch: {
+    //简写
+    // bannerList(newVal,oldVal){
+    // }
+
+    //完整写法
+    bannerList: {
+      //监视数据如果有了数据就去实例化swiper  但是
+      //监视有数据实例化的时候太快了,上面的结构也不一定形成（需要vfor遍历形成）
+      // watch + nextTick
+      // nextTick 等待页面最近一次的更新完成，会调用它内部的回调函数
+      // Vue.nextTick    vm（Vue的实例或者组件对象，就是this）.$nextTick  两个方法你开心就好，效果一样的
+      handler(newVal, oldVal) {
+        this.$nextTick(() => {
+          new Swiper(this.$refs.banner, {
+            // 如果需要分页器
+            pagination: {
+              el: ".swiper-pagination",
+            },
+            // 如果需要前进后退按钮
+            navigation: {
+              nextEl: ".swiper-button-next",
+              prevEl: ".swiper-button-prev",
+            },
+          });
+        });
+      },
+    },
+  },
+```
+
+## 42、动态显示 Floor 组件
+
+37 步已完成
+
+## 43、Floor 当中的轮播没效果？
+
+它是根据数据循环创建组件对象的，外部的 floor 创建的时候
+所以数据肯定是已经获取到了，所以我们在 mounted 内部去创建 swiper
+
+```html
+<div class="swiper-container" ref="floor2Swiper"></div>
+```
+
+```js
+import Swiper from "swiper";
+import "swiper/css/swiper.css";
+mounted() {
+    //这里直接创建Swiper实例，是可以的
+    // 因为我们floor当中 轮播图结构已经形成了
+    // 因为我们的floor数据不需要请求获取，而是直接在创建floor组件的时候就已经有这个数据了
+    new Swiper(this.$refs.floor2Swiper, {
+      // 如果需要分页器
+      pagination: {
+        el: ".swiper-pagination",
+      },
+      // 如果需要前进后退按钮
+      navigation: {
+        nextEl: ".swiper-button-next",
+        prevEl: ".swiper-button-prev",
+      },
+    });
+  },
+```
+
+## 44、定义可复用的轮播组件
+
+    banner是在watch当中去创建swiper 因为组件创建的时候数据不一定更新
+    floor是在mounted当中去创建swiper，因为内部组件创建的时候，数据已经存在了
+
+将 swiper 提取为公共组件,将 floor 组件中的轮播改写为跟 banner 中的轮播一样(只是数据不同)
+watch 监视不到 floor 组件的变化,因为一上来数据就有了,后面没有变化.需要使用配置 immediate:true,它会让监视内部的函数立即执行一次
+
+```js
+watch: {
+
+  // floor(){
+  //   //只是一般监视可以简写  //深度监视必须使用麻烦写法
+  // },
+
+  floor: {
+    //监视： 一般监视和深度监视
+    // deep:true, //配置深度监视
+    immediate:true, //immediate立即的意思
+    handler(newVal, oldVal) {
+      this.$nextTick(() => {
+        new Swiper(this.$refs.floor2Swiper, {
+          // 如果需要分页器
+          pagination: {
+            el: ".swiper-pagination",
+          },
+          // 如果需要前进后退按钮
+          navigation: {
+            nextEl: ".swiper-button-next",
+            prevEl: ".swiper-button-prev",
+          },
+        });
+      });
+    },
+  },
+},
+```
+
+提取 swiper 公共组件
+在 components 文件夹中创建 SliderLoop 组件
+结构
+
+```html
+<!--banner轮播-->
+<div class="swiper-container" id="mySwiper" ref="banner">
+  <div class="swiper-wrapper">
+    <div class="swiper-slide" v-for="banner in bannerList" :key="banner.id">
+      <img :src="banner.imgUrl" />
+    </div>
+  </div>
+  <!-- 如果需要分页器 -->
+  <div class="swiper-pagination"></div>
+
+  <!-- 如果需要导航按钮 -->
+  <div class="swiper-button-prev"></div>
+  <div class="swiper-button-next"></div>
+</div>
+```
+
+JS
+
+```js
+import Swiper from "swiper";
+import "swiper/css/swiper.min.css";
+export default {
+  name: "SliderLoop",
+  props: ["bannerList"],
+  watch: {
+    bannerList: {
+      immediate: true,
+      handler(newVal, oldVal) {
+        this.$nextTick(() => {
+          new Swiper(this.$refs.banner, {
+            // 如果需要分页器
+            pagination: {
+              el: ".swiper-pagination",
+            },
+
+            // 如果需要前进后退按钮
+            navigation: {
+              nextEl: ".swiper-button-next",
+              prevEl: ".swiper-button-prev",
+            },
+          });
+        });
+      },
+    },
+  },
+};
+```
+
+全局注册 SliderLoop 公共组件
+main.js 中全局注册
+
+```js
+import SliderLoop from "@/components/SliderLoop";
+Vue.component("SliderLoop", SliderLoop);
+```
+
+在 ListContainer 中使用 SliderLoop 公共组件,并将 bannerList 数据传入组件中
+
+```html
+<div class="center">
+  <SliderLoop :bannerList="bannerList"></SliderLoop>
+</div>
+```
+
+在 Floor 中使用 SliderLoop 公共组件,并将 floor.carouselList 数据传入组件中
+
+```html
+<div class="floorBanner">
+  <SliderLoop :bannerList="floor.carouselList"></SliderLoop>
+</div>
+```
+
+## 45、查看数据的时候应该怎么去查看
+
+看组件没有数据 接着看 vuex 没有数据 然后看 network 请求状态
