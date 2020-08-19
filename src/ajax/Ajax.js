@@ -1,6 +1,7 @@
 import axios from "axios";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
+import store from "@/store";
 
 const instance = axios.create({
   baseURL: "/api", //请求基础路径
@@ -9,6 +10,8 @@ const instance = axios.create({
 
 // 请求和响应拦截器;
 instance.interceptors.request.use((config) => {
+  let userTempId = store.state.user.getUserTempId;
+  config.headers.userTempId = userTempId;
   NProgress.start();
   return config;
 });
