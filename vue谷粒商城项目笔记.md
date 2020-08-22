@@ -532,6 +532,7 @@ export default {
       this.$store.dispatch("getCategoryList");
     },
   },
+  //注意:现在拿数据方法变了,因为使用了模块化然后合并到主模块
   computed: {
     // ...mapState(['categoryList']) //错的  之前是对的
     // state.categoryList
@@ -627,14 +628,17 @@ moveIn(index) {
 
 ```js
 import {throttle} from "lodash";
-moveIn: throttle(
-      function (index) {
-        //throttle是一个函数，内部需要传递一个回调函数，最后会返回一个新的函数
-        this.currentIndex = index;
-      },
-      30,
-      { trailing: false }
-    ), //在刚触发就执行
+methods: {
+  moveIn: throttle(
+    function (index) {
+      //throttle是一个函数，内部需要传递一个回调函数，最后会返回一个新的函数
+      this.currentIndex = index;
+    },
+    30,
+    { trailing: false }
+  ), //在刚触发就执行
+}
+
 ```
 
 ## 25、解决使用 lodash 节流后，快速移出后，可能还会显示某个子项
@@ -2367,6 +2371,23 @@ computed: {
 </div>
 ```
 
+在 ImageList 组件中接收展示数据
+
+```js
+props: ["imgList"],
+data() {
+  return {
+    defaultIndex: 0, //默认的下标（带橙色的框框）
+  };
+},
+```
+
+```html
+<div class="swiper-slide" v-for="(img, index) in imgList" :key="img.id">
+  <img :src="img.imgUrl" :class="{active:index === defaultIndex}" />
+</div>
+```
+
 在 Zoom 组件中接收展示数据
 
 ```js
@@ -2392,23 +2413,6 @@ computed: {
     <img :src="defaultImg.imgUrl" />
   </div>
   <div class="mask"></div>
-</div>
-```
-
-在 ImageList 组件中接收展示数据
-
-```js
-props: ["imgList"],
-data() {
-  return {
-    defaultIndex: 0, //默认的下标（带橙色的框框）
-  };
-},
-```
-
-```html
-<div class="swiper-slide" v-for="(img, index) in imgList" :key="img.id">
-  <img :src="img.imgUrl" :class="{active:index === defaultIndex}" />
 </div>
 ```
 
@@ -2526,7 +2530,7 @@ move(event){
 ```
 
 商品售卖属性的点击切换（排它）
-设置类名和绑定点击事件
+在 Detail 组件中设置类名和绑定点击事件
 
 ```html
 <!-- 通过isChecked属性设置类名 -->
@@ -2900,4 +2904,1207 @@ instance.interceptors.request.use((config) => {
     </li>
   </ul>
 </div>
+```
+
+购物车页面交互
+更新购物车数量数据
+给加减按钮和输入商品数量按钮绑定事件(同一个事件解决 3 个地方)
+
+```html
+<a href="javascript:void(0)" class="mins" @click="updateCartNum(cart,-1)">-</a>
+<input
+  autocomplete="off"
+  type="text"
+  :value="cart.skuNum"
+  minnum="1"
+  class="itxt"
+  @change="updateCartNum(cart,$event.target.value*1)"
+/>
+<a href="javascript:void(0)" class="plus" @click="updateCartNum(cart,1)">+</a>
+```
+
+创建更新购物车商品数量的函数
+
+```js
+methods: {
+async updateCartNum(cart,disNum){
+    if(cart.skuNum + disNum < 1){
+      disNum = 1 - cart.skuNum   //disNum和原来的数量加起来最少得是1,如果小于1得对disNum修正
+    }
+
+    //发请求去处理数量，返回成功后重新请求列表数据，就会看到最新的数据
+    try {
+      await this.$store.dispatch('addOrUpdateCart',{skuId:cart.skuId,skuNum:disNum})
+      this.getShopCartList()
+    } catch (error) {
+      alert(error.message)
+    }
+  },
+}
+```
+
+计算选中商品数量属性
+
+```js
+computed:{
+checkNum() {
+    //遍历购物车商品,将选中商品的数量累加
+    return this.shopCartList.reduce((pre, item) => {
+      if (item.isChecked === 1) {
+        pre += item.skuNum;
+      }
+      return pre;
+    }, 0);
+  },
+}
+```
+
+展示商品数量数据
+
+```html
+<div class="chosed">
+  已选择
+  <span>{{checkNum}}</span>件商品
+</div>
+```
+
+计算商品合计价格属性
+
+```js
+computed:{
+  allMoney() {
+    //将购物车商品价格累加
+    return this.shopCartList.reduce((pre, item) => {
+      if (item.isChecked === 1) {
+        pre += item.skuNum * item.skuPrice;
+      }
+      return pre;
+    }, 0);
+  },
+}
+```
+
+展示商品合计价格数据
+
+```html
+<div class="sumprice">
+  <em>总价（不含运费） ：</em>
+  <i class="summoney">{{allMoney}}</i>
+</div>
+```
+
+更新单个商品选中状态数据
+绑定点击事件
+
+```html
+<li class="cart-list-con1">
+  <!-- isChecked为1时为选中状态 -->
+  <input
+    type="checkbox"
+    name="chk_list"
+    :checked="cart.isChecked === 1"
+    @click="updateOne(cart)"
+  />
+</li>
+```
+
+选中需要发送请求,在 api 中添加请求接口函数
+
+```js
+// /api/cart/checkCart/{skuID}/{isChecked}  请求选中状态  get
+
+export const reqUpdateIsCheck = (skuId, isChecked) => {
+  return Ajax({
+    url: `/cart/checkCart/${skuId}/${isChecked}`,
+    method: "get",
+  });
+};
+```
+
+在 shopcart.js 中添加发送请求函数
+
+```js
+import { reqUpdateIsCheck } from "@/api";
+const actions = {
+  async updateIsCheck({ commit }, { skuId, isChecked }) {
+    const result = await reqUpdateIsCheck(skuId, isChecked);
+    if (result.code === 200) {
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed")); //返回的是失败的promise 结果就是这个return返回的失败的promise的原因
+      // return 'failed'  行 但是async函数将永远返回成功状态的promise
+    }
+  },
+};
+```
+
+在 ShopCart 组件中创建点击发送请求函数
+
+```js
+methods: {
+  async updateOne(cart){
+    //发请求
+    try {
+      //点击后获取商品id和选中状态发送请求
+      await this.$store.dispatch('updateIsCheck',{skuId:cart.skuId,isChecked:cart.isChecked === 1? 0 : 1})
+    //结果成功去重新请求列表页数据
+      this.getShopCartList()
+    } catch (error) {
+      alert(error.message)
+    }
+  }
+}
+```
+
+实现商品全选
+在 api 中添加全选发送请求函数
+使用 v-model 获取选中状态
+
+```html
+<div class="select-all">
+  <input class="chooseAll" type="checkbox" v-model="isCheckAll" />
+  <span>全选</span>
+</div>
+```
+
+在 shopcart.js 中创建全选发送请求函数
+
+```js
+const actions = {
+  async updateAllIsCheck({ commit, state, dispatch }, isChecked) {
+    let promises = [];
+    state.shopCartList.forEach((item) => {
+      //遍历每一个购物车，如果选中状态本身就和传递过来要修改的状态一样  就不用发请求
+      if (item.isChecked === isChecked) return;
+      //如果说不一样，都需要发送请求，而且所有的每一个的请求都成功，才算成功
+      let promise = dispatch("updateIsCheck", { skuId: item.skuId, isChecked });
+      promises.push(promise);
+    });
+    return Promise.all(promises);
+  },
+};
+```
+
+在 ShopCart 组件中创建 isCheckAll 计算属性
+
+```js
+computed:{
+  isCheckAll: {
+    get() {
+      return this.shopCartList.every((item) => item.isChecked === 1);
+    },
+    async set(val) {
+      //val的值是布尔值,需要转为1或者0来发送给后台
+      //我们要让所有的人都去修改状态val对应的状态 val如果是true ===》 1   如果是false ===> 0
+      try {
+        const result = await this.$store.dispatch('updateAllIsCheck',val?1:0)
+        console.log(result)
+        this.getShopCartList()
+      } catch (error) {
+        alert(error.message)
+      }
+    },
+  },
+}
+```
+
+删除购物车数据
+删除单个商品,在 api 中添加删除商品请求
+
+```js
+//请求删除一个购物车数据   /api/cart/deleteCart/{skuId}  delete
+
+export const reqDeleteCart = (skuId) => {
+  return Ajax({
+    url: `/cart/deleteCart/${skuId}`,
+    method: "delete",
+  });
+};
+```
+
+在 store 中添加发送请求函数
+
+```js
+import { reqDeleteCart } from "@/api";
+const actions = {
+  async deleteCart({ commit }, skuId) {
+    const result = await reqDeleteCart(skuId);
+    if (result.code === 200) {
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed")); //返回的是失败的promise 结果就是这个return返回的失败的promise的原因
+      // return 'failed'  行 但是async函数将永远返回成功状态的promise
+    }
+  },
+};
+```
+
+在 ShopCart 组件中点击发送请求
+
+```html
+<li class="cart-list-con7">
+  <a href="javascript:;" class="sindelet" @click="deleteOne(cart)">删除</a>
+  <br />
+  <a href="#none">移到收藏</a>
+</li>
+```
+
+添加回调函数
+
+```js
+methods: {
+async deleteOne(cart) {
+    try {
+      await this.$store.dispatch("deleteCart", cart.skuId);
+      this.getShopCartList();
+    } catch (error) {
+      alert(error.message);
+    }
+  },
+}
+```
+
+解决小 bug:商品全部删除全选框还打钩
+
+```js
+isCheckAll:{
+  get() {
+    return this.shopCartList.every((item) => item.isChecked === 1) && this.shopCartList.length > 0;
+  },
+}
+```
+
+删除选中商品(删除多个)
+在 store 中添加删除多个商品方法
+
+```js
+const actions = {
+  async deleteAllCheckCart({ commit, state, dispatch }) {
+    let promises = [];
+    state.shopCartList.forEach((item) => {
+      if (item.isChecked === 0) return;
+      let promise = dispatch("deleteCart", item.skuId);
+      promises.push(promise);
+    });
+    return Promise.all(promises);
+  },
+};
+```
+
+在组件中绑定点击事件
+
+```html
+<a href="javascript:;" @click="deleteAll">删除选中的商品</a>
+```
+
+定义回调函数
+
+```js
+async deleteAll(){
+  try {
+    await this.$store.dispatch('deleteAllCheckCart')
+    this.getShopCartList()
+  } catch (error) {
+    alert(error.message)
+  }
+}
+```
+
+## 71、 注册：
+
+注册和登录页静态组件
+将登录和注册路由组件复制到 page 文件夹下
+
+解决报错:将 icons.png 复制到 assets 下的 images 中
+
+登录和注册按钮的路由跳转
+
+```html
+<!-- Register组件中 -->
+<router-link to="/login">登陆</router-link>
+<!-- Login组件中 -->
+<router-link class="register" to="/register">立即注册</router-link>
+```
+
+在 api 中添加请求注册函数
+
+```js
+//请求注册  /api/user/passport/register   post    {mobile,password,code}
+
+export const reqRegister = (userInfo) => {
+  return Ajax({
+    url: "/user/passport/register",
+    method: "post",
+    data: userInfo,
+  });
+};
+```
+
+在 store 文件夹 user.js 中添加发送请求函数
+
+```js
+//引入接口请求函数
+import { reqRegister } from "@/api";
+const actions = {
+  async register({ commit }, userInfo) {
+    const result = await reqRegister(userInfo);
+    if (result.code === 200) {
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed"));
+    }
+  },
+};
+```
+
+在组件中绑定点击注册事件,收集注册信息
+
+```html
+<input type="text" placeholder="请输入你的手机号" v-model="mobile" />
+<input type="text" placeholder="请输入验证码" v-model="code" />
+<input type="text" placeholder="请输入你的登录密码" v-model="password" />
+<input type="text" placeholder="请输入确认密码" v-model="password2" />
+<button @click="register">完成注册</button>
+```
+
+```js
+data() {
+  return {
+    mobile: "",
+    code: "",
+    password: "",
+    password2: "",
+  };
+},
+```
+
+创建回调函数
+
+```js
+methods: {
+  async register() {
+    //收集参数形成对象
+    let { mobile, code, password, password2 } = this;
+    if (mobile && code && password && password2 && password === password2) {
+      //初步的验证
+      //dispatch相关的action把参数对象传递过去进行注册
+      try {
+        await this.$store.dispatch("register", { mobile, code, password });
+        alert("注册成功,自动跳转登录页");
+        this.$router.push("/login");
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+  },
+}
+```
+
+解决验证码问题以及点击更换验证码
+
+```html
+<!-- 下面的这个写法是跨域的，依赖的是代理去解决的，使用下面这个 -->
+<img ref="code" src="/api/user/passport/code" alt="code" @click="resetCode" />
+```
+
+设置回调函数
+
+```js
+methods: {
+  //重新设置src会重新发请求,就可以刷新验证码
+  resetCode(){
+   this.$refs.code.src = '/api/user/passport/code'
+ }
+}
+
+```
+
+## 72、 登录：
+
+在 api 中添加请求登录函数
+
+```js
+//请求登录  /api/user/passport/login  post  {mobile,password}
+
+export const reqLogin = (userInfo) => {
+  return Ajax({
+    url: "/user/passport/login",
+    method: "post",
+    data: userInfo,
+  });
+};
+```
+
+user.js 设置发送请求函数
+
+```js
+import { reqLogin } from "@/api";
+
+const state = {
+  //后台返回的用户信息
+  userInfo: {},
+};
+const mutations = {
+  RECEIVEUSERINFO(state, userInfo) {
+    state.userInfo = userInfo;
+  },
+};
+const actions = {
+  async login({ commit }, userInfo) {
+    const result = await reqLogin(userInfo);
+    if (result.code === 200) {
+      commit("RECEIVEUSERINFO", result.data);
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed"));
+    }
+  },
+};
+```
+
+Login 组件中绑定事件,获取登录数据
+
+```html
+<input type="text" placeholder="邮箱/用户名/手机号" v-model="mobile" />
+<input type="text" placeholder="请输入密码" v-model="password" />
+<!-- 取消form表单默认事件 -->
+<button class="btn" @click.prevent="login">登&nbsp;&nbsp;录</button>
+```
+
+定义回调函数
+
+```js
+data(){
+  return {
+    mobile:'',
+    password:''
+  }
+},
+methods:{
+  async login(){
+    //收集数据参数形成参数对象
+    let {mobile,password} = this
+    if(mobile && password){
+      try {
+        await this.$store.dispatch('login',{mobile,password})
+        alert('恭喜登录成功,将跳转至主页')
+        this.$router.push('/')
+      } catch (error) {
+        alert(error.message)
+      }
+    }
+  }
+}
+```
+
+登录后页面左上角显示用户名
+在 Header 组件中
+
+```html
+<!-- 当存在用户名时显示此元素(登录后显示) -->
+<p v-if="$store.state.user.userInfo.name">
+  <a href="javascript:;">{{$store.state.user.userInfo.name}}</a>
+  <!-- 登录后显示退出登录 -->
+  <a href="javascript:;" class="register" @click="logout">退出登录</a>
+</p>
+<p v-else>
+  <span>请</span>
+  <router-link to="/login">登录</router-link>
+  <!-- 未登录显示免费注册 -->
+  <router-link to="/register" class="register">免费注册</router-link>
+</p>
+```
+
+自动登录
+修改 user.js,把登录后的信息存储起来
+
+```js
+const actions = {
+  async login({ commit }, userInfo) {
+    const result = await reqLogin(userInfo);
+    if (result.code === 200) {
+      commit("RECEIVEUSERINFO", result.data);
+      //我们要想自动登录，必须把登录后的信息存储起来，这样的话刷新页面vuex当中存储的数据就不见了
+      //但是我们不用再去登录给vuex存数据，而是让vuex从存储的地方去拿
+      localStorage.setItem("USERINFO_KEY", JSON.stringify(result.data));
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed"));
+    }
+  },
+};
+```
+
+每次刷新先从本地存储拿用户信息,实现自动登录
+
+```js
+const state = {
+  userInfo: JSON.parse(localStorage.getItem("USERINFO_KEY")) || {},
+};
+```
+
+## 73、 退出登录：
+
+在 api 中添加请求退出登录函数
+
+```js
+//请求退出登录  /api/user/passport/logout
+export const reqLogout = () => {
+  return Ajax({
+    url: "/user/passport/logout",
+    method: "get",
+  });
+};
+```
+
+在 user.js 中设置发送请求函数
+
+```js
+import { reqLogout } from "@/api";
+const actions = {
+  async logout({ commit }) {
+    const result = await reqLogout();
+    if (result.code === 200) {
+      //清空，localStorage当中的用户数据
+      //清空， state当中的userInfo数据
+      localStorage.removeItem("USERINFO_KEY");
+      commit("RESETUSERINFO");
+      return "ok";
+    } else {
+      return Promise.reject(new Error("failed"));
+    }
+  },
+};
+//清空state中的数据
+const mutations = {
+  RESETUSERINFO(state) {
+    state.userInfo = {};
+  },
+};
+```
+
+在 Header 组件中绑定事件
+
+```html
+<a href="javascript:;" class="register" @click="logout">退出登录</a>
+```
+
+设置退出登录回调函数
+
+```js
+methods: {
+  async logout(){
+  try {
+    await this.$store.dispatch('logout')
+    alert('退出登录成功,自动跳转到首页')
+    this.$router.push('/')
+  } catch (error) {
+    alert(error.message)
+  }
+ }
+}
+
+```
+
+## 74、 携带 token 去进行后续操作
+
+userTempId 和 token 的区别
+
+userTempId 未登录状态下的用户身份识别标识
+
+token 登录状态下的用户身份识别标识
+
+两个都存在的话，后台会合并临时 id 对应的信息到 token 对应的信息上
+
+在 Ajax.js 中把 token 添加到请求头中
+
+```js
+instance.interceptors.request.use((config) => {
+  //处理config (请求报文)
+  //把用户的临时身份标识添加到每次请求的请求头当中
+  let userTempId = store.state.user.userTempId;
+  config.headers.userTempId = userTempId;
+
+  //把登录后的标识也添加到请求头当中
+  let token = store.state.user.userInfo.token;
+  if (token) {
+    config.headers.token = token;
+  }
+
+  //添加额外的功能（使用进度条）
+  //2
+  NProgress.start();
+  return config; //返回这个config  请求继续发送  发送的报文信息就是新的config对象
+});
+```
+
+在 Header 组件中将"我的购物车"换为路由
+
+```html
+
+```
+
+## 75、购物车结算页面
+
+静态组件显示
+将订单与支付相关组件复制到 pages 中
+配置结算页面路由
+
+```js
+import Trade from '@/pages/Trade'
+{
+  path:'/trade',
+  component:Trade
+},
+```
+
+在 ShopCart 组件中设置结算跳转路由
+
+```html
+<router-link to="/trade" class="sum-btn">结算</router-link>
+```
+
+在 api 中设置请求创建订单交易的函数
+
+```js
+//请求创建订单交易的数据  /api/order/auth/trade  get
+
+export const reqTradeInfo = () => {
+  return Ajax({
+    url: "/order/auth/trade",
+    method: "get",
+  });
+};
+```
+
+在 store 下创建 trade.js 管理结算页面数据
+请求获取结算页面数据
+
+```js
+import { reqTradeInfo } from "@/api";
+const state = {
+  tradeInfo: {},
+};
+const mutations = {
+  RECEIVETRADEINFO(state, tradeInfo) {
+    state.tradeInfo = tradeInfo;
+  },
+};
+const actions = {
+  async getTradeInfo({ commit }) {
+    const result = await reqTradeInfo();
+    if (result.code === 200) {
+      commit("RECEIVETRADEINFO", result.data);
+    }
+  },
+};
+```
+
+在 Trade 组件中发送请求
+
+```js
+mounted() {
+  this.getTradeInfo();
+},
+methods: {
+  getTradeInfo() {
+    this.$store.dispatch("getTradeInfo");
+  },
+},
+```
+
+在组件中获取数据
+
+```js
+computed: {
+    ...mapState({
+      tradeInfo: (state) => state.trade.tradeInfo,
+    }),
+    detailArrayList() {
+      return this.tradeInfo.detailArrayList || [];
+    },
+    userAddressList() {
+      return this.tradeInfo.userAddressList || [];
+    },
+  },
+};
+```
+
+在页面中展示动态数据
+
+```html
+<div
+  class="address clearFix"
+  v-for="(address, index) in userAddressList"
+  :key="address.id"
+>
+  <!-- 设置动态类名实现点击切换 -->
+  <span class="username" :class="{ selected: address.isDefault === '1' }"
+    >{{ address.consignee }}</span
+  >
+  <p>
+    <span class="s1">{{ address.userAddress }}</span>
+    <span class="s2">{{ address.phoneNum }}</span>
+    <span class="s3" v-if="address.isDefault === '1'">默认地址</span>
+  </p>
+</div>
+
+<div class="detail">
+  <h5>商品清单</h5>
+  <ul
+    class="list clearFix"
+    v-for="(goods, index) in detailArrayList"
+    :key="goods.skuId"
+  >
+    <li>
+      <img :src="goods.imgUrl" alt="" style="width: 100px; height: 80px;" />
+    </li>
+    <li>
+      <p>
+        {{ goods.skuName }}
+      </p>
+      <h4>7天无理由退货</h4>
+    </li>
+    <li>
+      <h3>￥{{ goods.orderPrice }}</h3>
+    </li>
+    <li>X{{ goods.skuNum }}</li>
+    <li>有货</li>
+  </ul>
+</div>
+
+<div class="bbs">
+  <h5>买家留言：</h5>
+  <textarea
+    placeholder="建议留言前先与商家沟通确认"
+    class="remarks-cont"
+    v-model="message"
+  ></textarea>
+</div>
+
+<div class="money clearFix">
+  <ul>
+    <li>
+      <b><i>{{ tradeInfo.totalNum }}</i>件商品，总商品金额</b>
+      <span>¥{{ tradeInfo.totalAmount }}</span>
+    </li>
+    <li>
+      <b>返现：</b>
+      <span>0.00</span>
+    </li>
+    <li>
+      <b>运费：</b>
+      <span>0.00</span>
+    </li>
+  </ul>
+</div>
+<div class="trade">
+  <div class="price">应付金额: <span>¥{{ tradeInfo.totalAmount }}</span></div>
+</div>
+```
+
+动态交互,点击切换地址,绑定事件
+
+```html
+<p @click="changeDefault(address)">
+  <span class="s1">{{ address.userAddress }}</span>
+  <span class="s2">{{ address.phoneNum }}</span>
+  <span class="s3" v-if="address.isDefault === '1'">默认地址</span>
+</p>
+```
+
+设置回调函数
+
+```js
+data() {
+    return {
+      message: "",
+    };
+  },
+methods: {
+  changeDefault(address) {
+    this.userAddressList.forEach((item) => (item.isDefault = "0"));
+    address.isDefault = "1";
+  },
+}
+```
+
+下方收货地址与上面点击选中的地址对应
+通过计算属性获得被选中的地址
+
+```js
+computed: {
+defaultAddress() {
+    return this.userAddressList.find((item) => item.isDefault === "1") || {};
+  },
+}
+```
+
+在页面中展示
+
+```html
+<div class="receiveInfo">
+  寄送至:
+  <span>{{ defaultAddress.userAddress }}</span>
+  收货人：<span>{{ defaultAddress.consignee }}</span>
+  <span>{{ defaultAddress.phoneNum }}</span>
+</div>
+```
+
+## 76、点击提交订单进入支付页面
+
+首先实现静态页面,配置支付页面路由
+
+```js
+import Pay from '@/pages/Pay'
+{
+  path:'/pay',
+  component:Pay
+},
+```
+
+需要先发请求,在 api 中创建请求接口函数
+
+```js
+//请求创建提交订单  /api/order/auth/submitOrder?tradeNo={tradeNo}   post
+export const reqSubmitOrder = (tradeNo, tradeInfo) => {
+  return Ajax({
+    url: `/order/auth/submitOrder?tradeNo=${tradeNo}`,
+    method: "post",
+    data: tradeInfo,
+  });
+};
+```
+
+在 main.js 中引入所有接口函数
+
+```js
+import * as API from "@/api";
+new Vue({
+  beforeCreate() {
+    //目的并不是以它作为事件总线，因为它没法使用$on和$emit,我们只是为了让所有的组件能用API
+    Vue.prototype.$API = API;
+  },
+});
+```
+
+需要先发请求 提交订单信息 成功返回订单编号 把订单编号携带跳转路由去到订单支付页面
+在 Trade 组件中绑定跳转到支付页面的事件和函数
+
+```html
+<a href="javascript:;" class="subBtn" @click="submitOrder">提交订单</a>
+```
+
+```js
+async submitOrder() {
+  //先收集请求需要的参数
+  let tradeNo = this.tradeInfo.tradeNo;
+  let tradeInfo = {
+    consignee: this.defaultAddress.consignee,   //用户名
+    consigneeTel: this.defaultAddress.phoneNum,   //用户联系电话
+    deliveryAddress: this.defaultAddress.userAddress, //用户地址
+    paymentWay: "ONLINE",                    //支付方式
+    orderComment: this.message,              //用户的留言
+    orderDetailList: this.detailArrayList    //交易信息当中的商品详情
+  };
+
+  //发请求，创建订单
+  const result = await this.$API.reqSubmitOrder(tradeNo, tradeInfo);
+  if (result.code === 200) {
+    //返回数据（订单编号）
+    //携带数据跳转支付页面
+    alert('订单创建成功，自动跳转支付页面')
+    this.$router.push('/pay?orderNo='+result.data)
+  } else {
+    alert("创建订单失败");
+  }
+},
+```
+
+## 77、订单支付页面也需要支付信息
+
+需要在订单支付页面根据订单编号发送请求获取支付信息，完成页面展示
+api 中添加接口请求函数
+
+```js
+//获取支付页面的支付信息  /api/payment/weixin/createNative/{orderId}
+export const reqPayInfo = (orderId) => {
+  return Ajax({
+    url: `/payment/weixin/createNative/${orderId}`,
+    method: "get",
+  });
+};
+```
+
+Pay 组件创建时发送请求获取数据
+
+```js
+data() {
+  return {
+    payInfo: {},
+  };
+},
+mounted() {
+  this.getPayInfo();
+},
+methods: {
+async getPayInfo() {
+    const result = await this.$API.reqPayInfo(this.$route.query.orderNo);
+    if (result.code === 200) {
+      this.payInfo = result.data;
+    }
+  },
+}
+```
+
+页面上展示动态数据
+
+```html
+<span class="fl">
+  请您在提交订单
+  <em class="orange time">4小时</em>之内完成支付，超时订单会自动取消。订单号：
+  <em>{{$route.query.orderNo}}</em>
+</span>
+
+<span class="fr">
+  <em class="lead">应付金额：</em>
+  <em class="orange money">￥{{payInfo.totalFee}}</em>
+</span>
+```
+
+## 78、点击订单支付页面立即支付会出现一个支付二维码
+
+安装 element-ui
+npm i element-ui -S
+按需引入安装
+npm install babel-plugin-component -D
+
+部分引入 element-ui 配置:babel.config.js
+
+```js
+module.exports = {
+  plugins: [
+    [
+      "component",
+      {
+        libraryName: "element-ui",
+        styleLibraryName: "theme-chalk",
+      },
+    ],
+  ],
+};
+```
+
+在 main.js 中引入需要使用的组件
+
+```js
+//部分引入element-ui当中的 MessageBox, Message
+import { MessageBox, Message } from "element-ui"; //引入了还没注册或者声明使用
+// 声明使用或者注册
+Vue.prototype.$msgbox = MessageBox;
+Vue.prototype.$alert = MessageBox.alert;
+Vue.prototype.$message = Message;
+```
+
+在 Pay 组件中给立即支付添加点击事件
+
+```html
+<a href="javascript:;" class="btn" @click="pay">立即支付</a>
+```
+
+使用 element-ui 去做弹出显示
+
+```js
+methods:{
+  pay() {
+    this.$alert(`<img src="${imgUrl}" />`, "请使用微信扫码支付", {
+          dangerouslyUseHTMLString: true,
+          showClose: false,
+          showCancelButton: true,
+          cancelButtonText: "支付遇到问题",
+          confirmButtonText: "我已成功支付",
+          center: true
+    })
+  }
+}
+```
+
+需要根据 codeUrl 使用 qrcode 生成要显示的微信二维码 url
+安装
+npm install --save qrcode
+使用
+
+```js
+//引入qrcode
+import QRCode from "qrcode";
+//1\生成二维码
+const imgUrl = await QRCode.toDataURL(this.payInfo.codeUrl);
+```
+
+弹出消息框的时候，我们需要循环定时器去查询支付状态
+在 api 中创建获取支付状态信息的函数
+
+```js
+//获取订单支付状态的信息
+///api/payment/weixin/queryPayStatus/{orderId}   get
+
+export const reqOrderStatus = (orderId) => {
+  return Ajax({
+    url: `/payment/weixin/queryPayStatus/${orderId}`,
+    method: "get",
+  });
+};
+```
+
+使用定时器不断发送请求获取支付状态信息
+
+```js
+//3\弹出消息同时循环的给后台发请求，获取该订单的支付状态数据
+//根据返回来的支付状态数据去决定要不要跳转到支付成功页面
+if (!this.timer) {
+  this.timer = setInterval(async () => {
+    //每2秒发一次请求获取支付状态信息
+    const result = await this.$API.reqOrderStatus(this.payInfo.orderId);
+    if (result.code === 200) {
+      //支付成功：
+      //停止定时器  跳转到支付成功页面  把当前的状态保存起来 以便用户点击我已成功支付的时候去判定
+      this.status = 200;
+      clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+      this.timer = null;
+      //跳转过去之后手动关闭我们的弹出消息框
+      this.$msgbox.close();
+      this.$router.push("/paysuccess");
+    }
+  }, 2000);
+}
+```
+
+两个按钮功能的实现
+
+```js
+beforeClose: (action, instance, done) => {
+  //关闭之前回调
+  //如果不写这个回调，那么无论点击什么按钮，消息盒子都会强制关闭
+  //如果写了这个回调，那么消息盒子的关闭由我们自己控制
+  if (action === "confirm") {
+    //真实的环境
+    // if(this.status !== 200){
+    //   this.$message.warning('小伙子没支付，支付后自动跳转')
+    // }
+
+    //测试环境
+    clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+    this.timer = null;
+    done();
+    //跳转过去之后手动关闭我们的弹出消息框
+    this.$router.push("/paysuccess");
+  } else if (action === "cancel") {
+    this.$message.warning("请联系尚硅谷前台小姐姐处理");
+    clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+    this.timer = null;
+    done(); //让我们手动关闭消息盒子
+  }
+},
+```
+
+最终完整支付功能函数
+
+```js
+async pay() {
+  //先生成二维码图片的路径
+  // With promises
+  try {
+    //1\生成二维码
+    const imgUrl = await QRCode.toDataURL(this.payInfo.codeUrl);
+    console.log(imgUrl);
+
+    //2\弹出一个消息框去展示二维码图片
+    this.$alert(`<img src="${imgUrl}" />`, "请使用微信扫码支付", {
+      dangerouslyUseHTMLString: true,
+      showClose: false,
+      showCancelButton: true,
+      cancelButtonText: "支付遇到问题",
+      confirmButtonText: "我已成功支付",
+      center: true,
+      //4\点击按钮之后的处理及和第三步产生联系
+      beforeClose: (action, instance, done) => {
+        //关闭之前回调
+        //如果不写这个回调，那么无论点击什么按钮，消息盒子都会强制关闭
+        //如果写了这个回调，那么消息盒子的关闭由我们自己控制
+        if (action === "confirm") {
+          //真实的环境
+          // if(this.status !== 200){
+          //   this.$message.warning('小伙子没支付，支付后自动跳转')
+          // }
+
+          //测试环境
+          clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+          this.timer = null;
+          done();
+          //跳转过去之后手动关闭我们的弹出消息框
+          this.$router.push("/paysuccess");
+        } else if (action === "cancel") {
+          this.$message.warning("请联系尚硅谷前台小姐姐处理");
+          clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+          this.timer = null;
+          done(); //让我们手动关闭消息盒子
+        }
+      },
+    }).then(() => {}).catch(() => {}); //函数的返回值也是promise
+
+    //3\弹出消息同时循环的给后台发请求，获取该订单的支付状态数据
+    //根据返回来的支付状态数据去决定要不要跳转到支付成功页面
+    if (!this.timer) {
+      this.timer = setInterval(async () => {
+        //每2秒发一次请求获取支付状态信息
+        const result = await this.$API.reqOrderStatus(this.payInfo.orderId);
+        if (result.code === 200) {
+          //支付成功：
+          //停止定时器  跳转到支付成功页面  把当前的状态保存起来 以便用户点击我已成功支付的时候去判定
+          this.status = 200;
+          clearInterval(this.timer); //clearInterval清除定时器，停止给定编号的定时器，并没有清空存储编号的变量
+          this.timer = null;
+          //跳转过去之后手动关闭我们的弹出消息框
+          this.$msgbox.close();
+          this.$router.push("/paysuccess");
+        }
+      }, 2000);
+    }
+  } catch (error) {
+    this.$message.error("生成二维码失败" + error.message);
+  }
+},
+```
+
+## 79、支付成功后我们可以跳转到支付成功页面
+
+配置支付成功组件的路由
+
+```js
+import PaySuccess from '@/pages/PaySuccess'
+{
+  path:'/paysuccess',
+  component:PaySuccess
+},
+```
+
+## 80、在支付成功页面我们可以选择继续购物，去到首页 也可以查看订单，去到用户中心
+
+设置查看订单页面路由
+
+```js
+import Center from '@/pages/Center'
+{
+  path:'/center',
+  component:Center
+},
+```
+
+在 PaySuccess 组件中设置路由跳转
+
+```html
+<p class="button">
+  <router-link class="btn-look" to="/center">查看订单</router-link>
+  <router-link class="btn-goshop" to="/">继续购物</router-link>
+</p>
 ```

@@ -12,6 +12,12 @@ const instance = axios.create({
 instance.interceptors.request.use((config) => {
   let userTempId = store.state.user.getUserTempId;
   config.headers.userTempId = userTempId;
+
+  let token = store.state.user.userInfo.token;
+  if (token) {
+    config.headers.token = token;
+  }
+
   NProgress.start();
   return config;
 });
