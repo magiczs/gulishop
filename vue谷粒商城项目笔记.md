@@ -752,11 +752,17 @@ mounted() {
 首先谁要加过渡就看谁在隐藏和显示
 需要放在 transition 标签内部，name 需要起名字
 
-<transition name="show"> 
-<div class="sort" v-show="isShow"></div>
-</transition>
 设置鼠标移入移出事件
+
+```html
 <div @mouseleave="moveOutDiv" @mouseenter="moveInDiv">
+  <h2 class="all">全部商品分类</h2>
+  <transition name="show">
+    <div class="sort" v-show="isShow"></div>
+  </transition>
+</div>
+```
+
 设置鼠标移入移出函数
 
 ```js
@@ -837,7 +843,7 @@ toSearch() {
 mock 会拦截我们的 ajax 请求，不会真正去发送请求。
 安装
 npm i mockjs -S
-创建 mockServer.js 文件(相当于后台服务)
+在 mock 文件夹中创建 mockServer.js 文件(相当于后台服务)
 
 ```js
 import mock from "mockjs";
@@ -1047,7 +1053,7 @@ props: ["floor"],
 
 swiper 的用法参考官方网站
 安装(需要安装 5 版本,6 版本有问题)
-npm i swoper@5 -S
+npm i swiper@5 -S
 引入 js 和 css
 
 ```js
@@ -1320,8 +1326,8 @@ export const reqGoodsListInfo = (searchParams) => {
 在 main.js 中引入 api,进行接口测试
 
 ```js
-import "@/api";
 //在api中调用接口请求函数测试
+import { reqGoodsListInfo } from "@/api";
 reqGoodsListInfo({});
 ```
 
@@ -1774,7 +1780,7 @@ methods:{
 </ul>
 ```
 
-点击的时候需要给父组件 Search 传递商品属性的参数 将 attr,attrValue 传给父组件,子向父通信
+点击商品属性的时候需要给父组件 Search 传递商品属性的参数 将 attr,attrValue 传给父组件,子向父通信
 
 ```js
 methods:{
@@ -4107,4 +4113,538 @@ import Center from '@/pages/Center'
   <router-link class="btn-look" to="/center">查看订单</router-link>
   <router-link class="btn-goshop" to="/">继续购物</router-link>
 </p>
+```
+
+在 Header 中设置跳转至我的订单路由
+
+```html
+<router-link to="/center">我的订单</router-link>
+```
+
+## 81、用户中心组件及子路由组件
+
+将 Center 组件中右侧内容拆分为子组件,在 Center 下创建 MyOrder、GroupOrder 子组件文件夹
+将 Center 组件右侧内容和 css 样式复制到 MyOrder 子组件中
+然后配置子组件路由
+
+```js
+import MyOrder from "@/pages/Center/MyOrder";
+import GroupOrder from "@/pages/Center/GroupOrder";
+{
+    path: "/center",
+    component: Center,
+    children: [
+      {
+        path: "myorder",
+        component: MyOrder,
+      },
+      {
+        path: "groupOrder",
+        component: GroupOrder,
+      },
+      {
+        path: "",
+        redirect: "myorder",
+      },
+    ],
+  },
+```
+
+在 Center 组件内展示路由组件
+
+```html
+<router-link to="/center/myorder">我的订单</router-link>
+<router-link to="/center/grouporder">团购订单</router-link>
+<!-- 右侧内容 -->
+<router-view></router-view>
+```
+
+在 api 中设置请求接口函数
+
+```js
+//请求获取我的订单分页列表  /api/order/auth/{page}/{limit}   GET
+
+export const reqMyOrderInfo = (page, limit) => {
+  return Ajax({
+    url: `/order/auth/${page}/${limit}`,
+    method: "get",
+  });
+};
+```
+
+在 MyOrder 组件中发送请求获取数据
+
+```js
+//初始化需要的数据
+data() {
+  return {
+    page: 1,
+    limit: 3,
+    myOrderInfo: {},
+  };
+},
+mounted() {
+    this.getMyOrderInfo();
+},
+methods: {
+  async getMyOrderInfo() {
+    const result = await this.$API.reqMyOrderInfo(this.page, this.limit);
+    if (result.code === 200) {
+      this.myOrderInfo = result.data;
+  }
+},
+computed: {
+  myOrderList() {
+    return this.myOrderInfo.records || [];
+  },
+},
+```
+
+展示动态数据
+
+```html
+<div class="orders">
+  <table
+    class="order-item"
+    v-for="(order, index) in myOrderList"
+    :key="order.id"
+  >
+    <thead>
+      <tr>
+        <th colspan="5">
+          <span class="ordertitle">
+            {{order.createTime}} 订单编号：{{order.outTradeNo}}
+            <span class="pull-right delete">
+              <img src="./images/delete.png" />
+            </span>
+          </span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(goods, index) in order.orderDetailList" :key="goods.id">
+        <td width="60%">
+          <div class="typographic">
+            <img :src="goods.imgUrl" style="width:100px;height:80px" />
+            <a href="#" class="block-text">{{goods.skuName}}</a>
+            <span>x{{goods.skuNum}}</span>
+            <a href="#" class="service">售后申请</a>
+          </div>
+        </td>
+
+        <!-- 
+                后面这几个单元格 判断如果是第一行就显示对应的内容
+                如果不是第一行，就不用显示了，因为一会我们要合并到第一行
+              -->
+
+        <template v-if="index === 0">
+          <!-- template这个标签不会影响我们的页面结构和css样式，可以把想要统一处理的元素用它包起来 -->
+          <td :rowspan="order.orderDetailList.length" width="8%" class="center">
+            {{order.consignee}}
+          </td>
+          <td
+            :rowspan="order.orderDetailList.length"
+            width="13%"
+            class="center"
+          >
+            <ul class="unstyled">
+              <li>总金额¥{{order.totalAmount}}</li>
+              <li>
+                {{order.paymentWay === "ONLINE"? '在线支付' : '货到付款'}}
+              </li>
+            </ul>
+          </td>
+          <td :rowspan="order.orderDetailList.length" width="8%" class="center">
+            <a href="#" class="btn">{{order.orderStatusName}}</a>
+          </td>
+          <td
+            :rowspan="order.orderDetailList.length"
+            width="13%"
+            class="center"
+          >
+            <ul class="unstyled">
+              <li>
+                <a href="mycomment.html" target="_blank">评价|晒单</a>
+              </li>
+            </ul>
+          </td>
+        </template>
+      </tr>
+    </tbody>
+  </table>
+</div>
+```
+
+使用 element-ui 分页器
+在 main.js 中引入分页器组件
+
+```js
+import { MessageBox, Message, Pagination } from "element-ui";
+Vue.use(Pagination);
+//之前的自定义分页器注释掉
+// import Pagination from '@/components/Pagination'
+// Vue.component('Pagination',Pagination)
+```
+
+在 MyOrder 组件中使用分页器
+
+```html
+<div class="choose-order">
+  <!--background 是否为分页按钮添加背景色 -->
+  <!--@size-change pageSize 改变时会触发 -->
+  <!--@current-change currentPage 改变时会触发 -->
+  <!--:current-page 当前页数，支持 .sync 修饰符 -->
+  <!--:total 总条目数 -->
+  <!--:page-size 每页显示条目个数，支持 .sync 修饰符 -->
+  <!--:pager-count 页码按钮的数量，当总页数超过该值时会折叠 -->
+  <!--:page-sizes 每页显示个数选择器的选项设置 -->
+  <!--layout 组件布局，子组件名用逗号分隔 -->
+  <el-pagination
+    background
+    @size-change="changePageSize"
+    @current-change="getMyOrderInfo"
+    :current-page="page"
+    :total="myOrderInfo.total"
+    :page-size="limit"
+    :pager-count="7"
+    :page-sizes="[3, 5, 10, 15]"
+    layout=" prev, pager, next, jumper, ->, sizes, total"
+  ></el-pagination>
+</div>
+```
+
+设置切换页码和每页显示条目的回调
+
+```js
+// changePageNum(num){
+    //   this.page = num
+    //   this.getMyOrderInfo();
+    // },
+
+
+  changePageSize(num){
+    this.limit = num
+    this.getMyOrderInfo();
+```
+
+切换页码优化:在发送请求函数中同时传入页码
+
+```js
+methods: {
+  async getMyOrderInfo(num = 1) {
+    //发请求的同时将页码参数传递
+    this.page = num
+    const result = await this.$API.reqMyOrderInfo(this.page, this.limit);
+    if (result.code === 200) {
+      this.myOrderInfo = result.data;
+    }
+  },
+}
+```
+
+## 82、路由守卫的理解
+
+```js
+router.beforeEach((to, from, next) => {
+  //to 代表目标(准备去的组件) 路由对象
+  //from 代表起始(从哪个组件) 路由对象
+  //next 放行还是不放行  是个函数
+  //next() 放行
+  //next(false) 不放行 停在当前位置
+  //next('/')  代表跳到指定的路径对应的组件
+});
+```
+
+## 83、必须登录后才能访问的多个界面使用全局守卫（交易相关、支付相关、用户中心相关） 自动跳转前面想而没到的页面
+
+在 router 文件夹下 index.js 中
+
+```js
+import store from "@/store";
+router.beforeEach((to, from, next) => {
+  let targetPath = to.path;
+  //订单交易页面trade  //支付相关 pay paysuccess  //用户中心 center  center/myorder  center/grouporder
+  if (
+    targetPath.startsWith("/trade") ||
+    targetPath.startsWith("/pay") ||
+    targetPath.startsWith("/center")
+  ) {
+    //代表你要去的地方需要判断用户是否登录
+    if (store.state.user.userInfo.name) {
+      next();
+    } else {
+      //未登录就跳到登录页
+      next("/login?redirect=" + targetPath);
+    }
+  } else {
+    //代表不需要用户登录的放行
+    next();
+  }
+});
+```
+
+自动跳转前面想而没到的页面
+在 Login 组件中
+
+```js
+methods: {
+async login() {
+    //收集数据参数形成参数对象
+    let { mobile, password } = this;
+    if (mobile && password) {
+      try {
+        await this.$store.dispatch("login", { mobile, password });
+        alert("恭喜登录成功");
+        let redirectPath = this.$route.query.redirect;
+        //如果是点击需要登录才能进入的页面,就将路由地址通过query参数传递过来,有query参数就跳转到登录前点击的页面
+        if (redirectPath) {
+          this.$router.push(redirectPath);
+        } else {
+          this.$router.push("/");
+        }
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+  },
+}
+```
+
+## 84、只有没登录才能看到登录的界面
+
+路由独享守卫
+在 routes.js 中
+
+```js
+import store from "@/store";
+{
+  path: "/login",
+  component: Login,
+  meta: {
+    isHide: true,
+  },
+  //路由独享守卫
+  beforeEnter: (to, from, next) => {
+    //没有登录才能进入到登录页面
+    if (!store.state.user.userInfo.name) {
+      next();
+    } else {
+      next(false);
+    }
+  },
+},
+```
+
+## 85、只有携带了 skuNum 和 sessionStorage 内部有 skuInfo 数据 才能看到添加购物车成功的界面
+
+```js
+{
+  path:'/addcartsuccess',
+  component:AddCartSuccess,
+  //路由独享守卫
+  beforeEnter: (to, from, next) => {
+    let skuInfo = sessionStorage.getItem('SKUINFO_KEY')
+    if(to.query.skuNum && skuInfo){
+      next()
+    }else{
+      next(false)
+    }
+  }
+},
+```
+
+## 86、只有从购物车界面才能跳转到交易页面（创建订单）
+
+```js
+{
+  path:'/trade',
+  component:Trade,
+  beforeEnter: (to, from, next) => {
+    if(from.path === '/shopcart'){
+      next()
+    }else{
+      next(false)
+    }
+  }
+},
+```
+
+## 87、只有从交易页面（创建订单）页面才能跳转到支付页面
+
+```js
+{
+  path:'/pay',
+  component:Pay,
+  beforeEnter: (to, from, next) => {
+    if(from.path === '/trade'){
+      next()
+    }else{
+      next(false)
+    }
+  }
+},
+```
+
+## 88、只有从支付页面才能跳转到支付成功页面
+
+```js
+{
+  path:'/paysuccess',
+  component:PaySuccess,
+  beforeEnter: (to, from, next) => {
+    if(from.path === '/pay'){
+      next()
+    }else{
+      next(false)
+    }
+  }
+},
+```
+
+## 89、图片懒加载
+
+下载官方插件
+npm install vue-lazyload
+
+在 main.js 中引入并配置 loading 图片
+
+```js
+//图片懒加载的插件
+import VueLazyload from "vue-lazyload";
+import loading from "@/assets/images/timg.gif";
+// 在图片界面没有进入到可视范围前不加载, 在没有得到图片前先显示loading图片
+Vue.use(VueLazyload, {
+  // 内部自定义了一个指令lazy
+  loading, // 指定未加载得到图片之前的loading图片
+});
+```
+
+在 Search 组件中对异步获取的图片实现懒加载
+
+```html
+<img v-lazy="goods.defaultImg" />
+```
+
+## 90、路由懒加载
+
+调用 import 函数把一次性打包的所有路由组件分开去加载 打包会打包成一个单独的文件
+访问哪一个再去加载哪一个
+
+    (1）	当打包构建应用时，JS包会变得非常大，影响页面加载。如果我们能把不同路由对应的组件分割成不同的代码块，
+    	然后当路由被访问的时候才加载对应组件，这样就更加高效了
+    (2)	本质就是Vue 的异步组件在路由组件上的应用
+    (3)	需要使用动态import语法, 也就是import()函数
+    (4)	import('模块路径'): webpack会对被引入的模块单独打包一个小文件
+    (5)     当第一次访问某个路径对应的组件时，此时才会调用import函数去加载对应的js打包文件
+
+```js
+//import函数： 1、把对应路径的东西最终打包成单个文件
+// 2、懒加载的功能：当访问对应的组件的时候，import才会调用实现懒加载
+const Home = () => import("@/pages/Home");
+```
+
+## 91、验证规则插件的使用 vee-validate
+
+下载: npm install -S vee-validate@2.2.15
+在 src 下创建 validate.js 引入
+引入插件:
+
+```js
+import Vue from "vue";
+import VeeValidate from "vee-validate";
+
+Vue.use(VeeValidate);
+```
+
+main.js 中引入 validate 文件
+
+```js
+import "./validate";
+```
+
+基本使用
+
+```html
+<input
+  placeholder="请输入你的手机号"
+  v-model="mobile"
+  name="phone"
+  v-validate="{required: true,regex: /^1\d{10}$/}"
+  :class="{invalid: errors.has('phone')}"
+/>
+<span class="error-msg">{{ errors.first('phone') }}</span>
+
+<input
+  placeholder="请输入验证码"
+  v-model="code"
+  name="code"
+  v-validate="{ required: true, regex: /^\d{4}$/ }"
+  :class="{ invalid: errors.has('code') }"
+/>
+<span class="error-msg">{{ errors.first("code") }}</span>
+
+<input
+  placeholder="请输入你的登录密码"
+  v-model="password"
+  name="password"
+  v-validate="{ required: true, regex: /^\w{6,20}$/ }"
+  :class="{ invalid: errors.has('password') }"
+/>
+<span class="error-msg">{{ errors.first("password") }}</span>
+
+<input
+  placeholder="请输入确认密码"
+  v-model="password2"
+  name="password2"
+  v-validate="{ required: true, regex: /^\w{6,20}$/, is: password }"
+  :class="{ invalid: errors.has('password2') }"
+/>
+<span class="error-msg">{{ errors.first("password2") }}</span>
+
+<input
+  type="checkbox"
+  v-model="isCheck"
+  name="isCheck"
+  v-validate="{ agree: true }"
+  :class="{ invalid: errors.has('isCheck') }"
+/>
+<span class="error-msg">{{ errors.first("isCheck") }}</span>
+```
+
+在点击登录按钮时对所有表单项进行验证
+
+```js
+const success = await this.$validator.validateAll();
+```
+
+提示文本信息本地化
+
+```js
+//验证信息本地化
+import zh_CN from "vee-validate/dist/locale/zh_CN"; // 引入中文message
+VeeValidate.Validator.localize("zh_CN", {
+  messages: {
+    ...zh_CN.messages,
+    is: (field) => `${field}必须与密码相同`, // 修改内置规则的message
+  },
+  attributes: {
+    // 给校验的field属性名映射中文名称
+    phone: "手机号",
+    code: "验证码",
+    password: "密码",
+    password2: "确认密码",
+    isCheck: "协议",
+  },
+});
+```
+
+自定义验证规则
+
+```js
+VeeValidate.Validator.extend("agree", {
+  validate: (value) => {
+    return value;
+  },
+  getMessage: (field) => field + "必须同意",
+});
 ```

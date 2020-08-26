@@ -17,19 +17,39 @@
             <form action="##">
               <div class="input-text clearFix">
                 <span></span>
-                <input
+                <!-- <input
+                  placeholder="邮箱/用户名/手机号"
                   type="text"
+                  v-model="mobile"
+                /> -->
+                <input
                   placeholder="邮箱/用户名/手机号"
                   v-model="mobile"
+                  name="phone"
+                  v-validate="{ required: true, regex: /^1\d{10}$/ }"
+                  :class="{ invalid: errors.has('phone') }"
                 />
+                <em class="error-msg" style="color:red">{{
+                  errors.first("phone")
+                }}</em>
               </div>
               <div class="input-text clearFix">
                 <span class="pwd"></span>
-                <input
+                <!-- <input
                   type="text"
                   placeholder="请输入密码"
                   v-model="password"
+                /> -->
+                <input
+                  placeholder="请输入你的登录密码"
+                  v-model="password"
+                  name="password"
+                  v-validate="{ required: true, regex: /^\w{6,20}$/ }"
+                  :class="{ invalid: errors.has('password') }"
                 />
+                <em class="error-msg" style="color:red">{{
+                  errors.first("password")
+                }}</em>
               </div>
               <div class="setting clearFix">
                 <label class="checkbox inline">
@@ -38,7 +58,9 @@
                 </label>
                 <span class="forget">忘记密码？</span>
               </div>
-              <button class="btn" @click.prevent="login">登&nbsp;&nbsp;录</button>
+              <button class="btn" @click.prevent="login">
+                登&nbsp;&nbsp;录
+              </button>
             </form>
 
             <div class="call clearFix">
@@ -83,15 +105,22 @@ export default {
       password: "",
     };
   },
+
   methods: {
     async login() {
       //收集数据参数形成参数对象
       let { mobile, password } = this;
-      if (mobile && password) {
+      const success = await this.$validator.validateAll(); // 对所有表单项进行验证
+      if (success) {
         try {
           await this.$store.dispatch("login", { mobile, password });
           alert("恭喜登录成功");
-          this.$router.push("/");
+          let redirectPath = this.$route.query.redirect;
+          if (redirectPath) {
+            this.$router.push(redirectPath);
+          } else {
+            this.$router.push("/");
+          }
         } catch (error) {
           alert(error.message);
         }

@@ -9,9 +9,11 @@
           </div>
           <div class="right-info">
             <p class="title">
-              {{skuInfo.skuName}}
+              {{ skuInfo.skuName }}
             </p>
-            <p class="attr">颜色：WFZ5099IH/5L钛金釜内胆 数量：{{$route.query.skuNum}}</p>
+            <p class="attr">
+              颜色：WFZ5099IH/5L钛金釜内胆 数量：{{ $route.query.skuNum }}
+            </p>
           </div>
         </div>
         <div class="right-gocart">
@@ -31,6 +33,17 @@ export default {
       skuInfo: JSON.parse(sessionStorage.getItem("SKUINFO_KEY")) || {},
     };
   },
+  // beforeRouteEnter(to, from, next) {
+  //   next((vm) => {
+  //     let skuNum = vm.$route.query.skuNum;
+  //     let skuInfo = sessinonStorage.getItem("SKUINFO_KEY");
+  //     if (skuNum && skuInfo) {
+  //       next();
+  //     } else {
+  //       next('/');
+  //     }
+  //   });
+  // },
 };
 </script>
 

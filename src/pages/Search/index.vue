@@ -91,7 +91,7 @@
                 <div class="list-wrap">
                   <div class="p-img">
                     <router-link :to="`/detail/${goods.id}`"
-                      ><img :src="goods.defaultImg"
+                      ><img v-lazy="goods.defaultImg"
                     /></router-link>
                   </div>
                   <div class="price">
@@ -123,13 +123,24 @@
               </li>
             </ul>
           </div>
-          <Pagination
+          <!-- <Pagination
             :currentPageNum="searchParams.pageNo"
             :total="goodsListInfo.total"
             :pageSize="searchParams.pageSize"
             :continueSize="5"
             @changePageNum="changePageNum"
-          />
+          /> -->
+          <el-pagination
+            background
+            @size-change="changePageSize"
+            @current-change="getGoodsListInfo"
+            :current-page="searchParams.pageNo"
+            :total="goodsListInfo.total"
+            :page-size="searchParams.pageSize"
+            :pager-count="7"
+            :page-sizes="[3, 5, 10, 15]"
+            layout=" prev, pager, next, jumper, ->, sizes, total"
+          ></el-pagination>
         </div>
       </div>
     </div>
@@ -151,7 +162,7 @@ export default {
         keyword: "",
         order: "2:desc",
         pageNo: 1,
-        pageSize: 2,
+        pageSize: 3,
         props: [],
         trademark: "",
       },
@@ -165,7 +176,8 @@ export default {
     this.getGoodsListInfo();
   },
   methods: {
-    getGoodsListInfo() {
+    getGoodsListInfo(num = 1) {
+      this.searchParams.pageNo = num;
       this.$store.dispatch("getGoodsListInfo", this.searchParams);
     },
     //处理请求参数
@@ -277,8 +289,8 @@ export default {
       this.getGoodsListInfo();
     },
 
-    changePageNum(page) {
-      this.searchParams.pageNo = page;
+    changePageSize(num) {
+      this.searchParams.pageSize = num;
       this.getGoodsListInfo();
     },
   },
